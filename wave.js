@@ -3,16 +3,15 @@ function Wave(el,widthbox, scroller) {
 	this.zoom *= factor;
 	var min = this.scroller.clientWidth/this.buf.length;
 	if (this.zoom < min) {
-	    factor *= min / this.zoom;
-	    this.zoom = min;
+//	    console.log("min="+min+" zoom="+this.zoom);
+//	    factor *= min / this.zoom;
+//	    this.zoom = min;
 	}
 
 	var start = this.scroller.scrollLeft / this.zoom * factor;
 	var end = start + this.scroller.clientWidth / this.zoom * factor;
 	var mid = (start + end)/2;
 	var len = (end - start)/2;
-
-	this.widthbox.style.width=Math.floor(this.buf.length*this.zoom)+"px";
 
 	var s2 = mid - len / factor;
 
@@ -26,10 +25,29 @@ function Wave(el,widthbox, scroller) {
 	this.invalidate();
     }
 
+    function scrollto(pos) {
+	var overlap = 0.05; /* 5% */
+	pos *= this.zoom;
+	var w = this.el.width;
+	if (this.scrolloffset+w*overlap < pos &&
+	    this.scrolloffset+w*(1-overlap) > pos)
+	    return;
+
+	var s = pos - this.el.width/2;
+	if (s < 0)
+	    s = 0;
+	else
+	    if (s+this.el.width > this.buf.length*this.zoom)
+		s= this.buf.length*this.zoom - this.el.width;
+
+	this.widthbox.style.width=Math.floor(this.buf.length*this.zoom)+"px";
+	this.scrolloffset = this.scroller.scrollLeft = s;
+    }
+
     function invalidate() {
 	if (!this.buf) return;
 	this.el.width = this.scroller.clientWidth;
-	this.lastoffset = undefined;
+	this.lastlen = this.lastoffset = undefined;
 	this.draw();
     }
 
@@ -47,6 +65,10 @@ function Wave(el,widthbox, scroller) {
 	var h=el.height;
 	var len=buf.length;
 	var yscale=h/2;
+
+	if (len !== this.lastlen)
+	    this.widthbox.style.width=Math.floor(this.buf.length*this.zoom)+"px";
+
 	c.save();
 	/* px */
 	var xstart=scrolloffset;
@@ -62,69 +84,109 @@ function Wave(el,widthbox, scroller) {
 	    if (lastvalid) {
 		laststart=this.lastoffset;
 		lastend=this.lastoffset+w;
-		overlap = true;
+		if (laststart == scrolloffset) {
+		    /* we didn't scroll, but previously-invalid data may
+		     * now be valid */
+		    xstart = this.lastlen * zoom-1;
+		    xend = len * zoom+1;
+		    console.log("xstart="+xstart+" xend="+xend);
+		    c.clearRect(xstart+scrolloffset, 0, xend-xstart, h);
+		    //c.beginPath();
+		    //c.rect(lastend-scrolloffset,0,xend-lastend,h);
+		    //c.closePath();
+		    //c.clip();
+		} else {
+		    overlap = true;
 
-		if (lastend >= scrolloffset && laststart <= scrolloffset) {
-		    xstart = lastend;
-		    var im=c.getImageData(0,0,w,h);
+		    if (lastend >= scrolloffset && laststart <= scrolloffset) {
+			xstart = lastend;
+			var im=c.getImageData(0,0,w,h);
+			el.width=w; /* clear */
+			c.putImageData(im,laststart-scrolloffset,0);
+			c.beginPath();
+			c.rect(lastend-scrolloffset,0,xend-lastend,h);
+			c.closePath();
+			c.clip();
+		    } else if (laststart <= scrolloffset+w && lastend >= scrolloffset+w) {
+			xend = laststart;
+			var im=c.getImageData(0,0,w,h);
+			el.width=w; /* clear */
+			c.putImageData(im,laststart-scrolloffset,0);
+			c.beginPath();
+			c.rect(0,0,laststart-xstart,h);
+			c.closePath();
+			c.clip();
+		    } else
+			overlap = false;
+
+		if (!overlap)
 		    el.width=w; /* clear */
-		    c.putImageData(im,laststart-scrolloffset,0);
-		    c.beginPath();
-		    c.rect(lastend-scrolloffset,0,xend-lastend,h);
-		    c.closePath();
-		    c.clip();
-		} else if (laststart <= scrolloffset+w && lastend >= scrolloffset+w) {
-		    xend = laststart;
-		    var im=c.getImageData(0,0,w,h);
-		    el.width=w; /* clear */
-		    c.putImageData(im,laststart-scrolloffset,0);
-		    c.beginPath();
-		    c.rect(0,0,laststart-xstart,h);
-		    c.closePath();
-		    c.clip();
-		} else
-		    overlap = false;
+		}
 	    }
-	    
-	    if (!overlap)
-		el.width=w; /* clear */
 	}
 
 	//    gebi("d").innerHTML= ("xstart "+xstart+" xend "+xend+" lastoff "+lastoffset+" l+w "+(lastoffset+w));
 	this.lastoffset=scrolloffset;
-
+	this.lastlen=len;
 	
 	var istart=Math.floor(xstart/zoom)-1;
 	var iend=Math.ceil(xend/zoom)+1;
-	if (istart<0) istart=0;
-	if (iend>len) iend=len;
+	//if (istart<0) istart=0;
+	//if (iend>len) iend=len;
 	
 	c.translate(-scrolloffset,yscale);
 	/* loop */
 //	c.fillStyle="turquoise";
 //	c.fillRect (repstart*zoom, -yscale, replen*zoom, yscale*2);
 	
-	/* axis */
-	c.beginPath(); c.moveTo(scrolloffset, 0); c.lineTo(w+scrolloffset, 0); c.stroke();
-	
 	/* wave */
-	c.beginPath();
-	for (var i=istart; i<iend; i++) {
-	    var x=i*zoom;
-	    if (zoom<1) {
-		var min=buf[i], max=buf[i];
-		j=i+1/zoom;
-		while (i++<=j) {
-		    if (min<buf[i]) min=buf[i];
-		    if (max>buf[i]) max=buf[i];
-		}
-		c.lineTo(x, -min*yscale);
-		c.lineTo(x, -max*yscale);
-	    } else {
-		c.lineTo(x, -buf[i]*yscale);
-	    }
+	function shade(p,q) {
+	    //console.log("p="+p+" q="+q);
+	    c.save();
+	    c.fillStyle='lightgray';
+	    c.fillRect(p*zoom,-yscale,(q-p)*zoom,yscale*2);
+	    c.restore();
 	}
-	c.stroke();
+	if (!len) {
+	    /* no data */ 
+	    shade(istart, iend);
+	} else {
+	    if (istart < 0) {
+		shade(istart, 0);
+		istart = 0;
+	    }	    
+	    if (iend > len) {
+		shade(len, iend);
+		iend = len;
+	    }
+
+	    /* axis */
+	    c.beginPath();
+	    c.moveTo(istart*zoom, 0);
+	    c.lineTo(iend*zoom, 0);
+	    c.stroke();
+	    var r='#'+(Math.random()*0xffffff|0).toString(16);
+	    //console.log(r);
+	    c.strokeStyle=r;
+	    c.beginPath();
+	    for (var i=istart; i<iend; i++) {
+		var x=i*zoom;
+		if (zoom<1) {
+		    var min=buf[i], max=buf[i];
+		    var j=i+1/zoom;
+		    //console.log("i="+i+" j="+j);
+		    while (i++<=j) {
+			if (min<buf[i]) min=buf[i];
+			if (max>buf[i]) max=buf[i];
+		    }
+		    c.lineTo(x, -min*yscale);
+		    c.lineTo(x, -max*yscale);
+		} else {
+		    c.lineTo(x, -buf[i]*yscale);
+		}
+	    }
+	    c.stroke();
+	}
 	c.restore();
     }
 
@@ -136,9 +198,11 @@ function Wave(el,widthbox, scroller) {
 	zoom: 1,
 	scrolloffset: 0,
 	lastoffset: undefined,
+	lastlen: undefined,
 	rstart: undefined,
 	rlen: undefined,
 	zoomby: zoomby,
+	scrollto: scrollto,
 	draw: draw,
 	invalidate: invalidate,
     };

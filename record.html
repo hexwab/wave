@@ -1,8 +1,9 @@
 <html>
 <head>
 <style>
-#wave div#canvasbox { position: relative; width: 800px}
+div#canvasbox { position: relative; width: 800px}
 #canvas { position: absolute; top:0; left: 0; border-top: 1px solid black; border-bottom: 1px solid black; }
+#posbar { position: absolute; top:0; left: 20px; width:1px; height: 262px; background: darkblue; display: none; }
 #fakecanvas { width: 100%; overflow-x: scroll; }
 #fakecanvas2 { width: 1000px; height: 262px; }
 </style>
@@ -10,14 +11,21 @@
 <body>
 <div id="status">
 </div>
+<meter id="meter" min="-12" max="0" low="-8" high="-1"></meter>
+<input type=button id="start" value="Start"></input>
+<input type=button id="stop" value="Stop"></input>
+<input type=button id="play" value="Play"></input>
+<input type=button id="zin" value="+"></input>
+<input type=button id="zout" value="-"></input>
+<input type=button id="clear" value="Clear"></input>
+<input type=button id="i" value="Redraw"></input>
       <div id=canvasbox>
+	<div id="posbar"></div>
 	<canvas id="canvas" width=400 height=260></canvas>
 	<div id="fakecanvas">
 	  <div id="fakecanvas2"></div>
 	</div>
       </div>
-
-
 <script src="wave.js"></script>
 <script src="record.js"></script>
 </body>
