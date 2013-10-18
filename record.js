@@ -12,7 +12,7 @@ try {
 ctx.script = ctx.createScriptProcessor ||
                  ctx.createJavaScriptNode;
 var node = ctx.script(
-	  1024, /* buf */
+	  2048, /* buf */
 	  1,    /* in */
 	  1     /* out */
 	 );
@@ -22,27 +22,31 @@ var dirty = false;
 
 function gebi(el) { return document.getElementById(el); }
 
+
 var meter = gebi("meter");
 var el = gebi("status");
 var posbar = gebi("posbar");
 var recording = false;
 gebi("start").onclick = function () { recording = true; };
 gebi("stop").onclick = function () { if (recording) recording = false; if (playing) stop(); };
-gebi("clear").onclick = function () { rec=[]; dirty = true; };
+gebi("clear").onclick = function () { rec=[]; dirty = true; wave.invalidate(); };
 gebi("play").onclick = function () { if (!playing) { makebuf(); play(); } };
 gebi("zin").onclick = function () { wave.zoomby(2); };
 gebi("zout").onclick = function () { wave.zoomby(0.5); };
 gebi("i").onclick = function () { wave.invalidate(); };
+var autozoom, azel=gebi("autozoom");
+azel.onchange = function () { autozoom=azel.checked; };
+azel.onchange();
 node.onaudioprocess = function(e){
     var buf=e.inputBuffer.getChannelData(0);
-
     { /* meter */
 	var sum=0;
 	for (var i=0; i<buf.length; i++)
 	    sum += buf[i] * buf[i];
 	sum /= buf.length;
 	//    el.innerHTML=Math.log(sum)/Math.log(10)+" dB"+" len="+rec.length;
-	meter.value = Math.log(sum)/Math.log(10);
+	var vu = Math.log(sum)/Math.log(10);
+	meter.value = vu < -30 ? -30 : vu;
     }
 
 
@@ -59,7 +63,7 @@ node.onaudioprocess = function(e){
 }
 
 if (!navigator.getUserMedia)
-    navigator.getUserMedia = navigator.webkitGetUserMedia;
+    navigator.getUserMedia = navigator.webkitGetUserMedia || navigator.mozGetUserMedia;
 navigator.getUserMedia({audio: true}, startUserMedia, function(e) {
 			  alert('No live audio input: ' + e);
 		       });
@@ -82,7 +86,7 @@ function startUserMedia(stream) {
 
 var wave = new Wave(gebi("canvas"),gebi("fakecanvas2"),gebi("fakecanvas"));
 wave.buf = rec;
-wave.zoomby(0.01); /* zoom out */
+wave.zoomby(0.004); /* zoom out */
 
 var playing = false;
 var timestarted;
@@ -92,7 +96,8 @@ var playnode;
 function update () {
     if (dirty) {
 	wave.buf = rec;
-	wave.scrollto(rec.length);
+	if (wave.scrollto(rec.length, 0, 0.5) && autozoom)
+	    wave.zoomby(1/1.3);
 	wave.draw();
 	dirty = false;
     }
@@ -102,7 +107,7 @@ function update () {
 	var pos = (ctx.currentTime - timestarted) * ctx.sampleRate;
 	var offset = pos*wave.zoom - wave.scrolloffset;
 	posbar.style.left = (offset|0)+"px";
-	wave.scrollto(pos);
+	wave.scrollto(pos, 0.05, 0.05);
 //	console.log((offset|0)+"px");
     }
     window.requestAnimationFrame(update);

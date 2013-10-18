@@ -25,30 +25,53 @@ function Wave(el,widthbox, scroller) {
 	this.invalidate();
     }
 
-    function scrollto(pos) {
-	var overlap = 0.05; /* 5% */
+    function scrollto(pos, overlap, off) {
 	pos *= this.zoom;
 	var w = this.el.width;
 	if (this.scrolloffset+w*overlap < pos &&
 	    this.scrolloffset+w*(1-overlap) > pos)
-	    return;
+	    return false;
 
-	var s = pos - this.el.width/2;
+	var s = pos - w*off;
 	if (s < 0)
 	    s = 0;
 	else
-	    if (s+this.el.width > this.buf.length*this.zoom)
+	    if (s+w > this.buf.length*this.zoom)
 		s= this.buf.length*this.zoom - this.el.width;
 
 	this.widthbox.style.width=Math.floor(this.buf.length*this.zoom)+"px";
 	this.scrolloffset = this.scroller.scrollLeft = s;
+
+	return true;
     }
 
     function invalidate() {
 	if (!this.buf) return;
-	this.el.width = this.scroller.clientWidth;
+	this.el.width = this.scroller.clientWidth * 1 /* dpr */;
 	this.lastlen = this.lastoffset = undefined;
 	this.draw();
+    }
+
+    function pattern() {
+	var c=document.createElement("canvas");
+	var ctx=c.getContext("2d");
+	c.width = c.height = 12; /* adjustable */
+	ctx.scale(c.width/20,c.height/20);
+	function r(x,y,w,h) {
+	    ctx.beginPath();
+	    ctx.rect(x,y,w,h);
+	    ctx.closePath();
+	    ctx.fill();
+	}
+	ctx.fillStyle="#555";
+	r(0,0,20,20);
+	ctx.fillStyle="#aaa";
+	ctx.scale(Math.sqrt(.5),Math.sqrt(.5));
+	ctx.rotate(-Math.PI/4);
+	r(-100, 0, 200,10);
+	r(-100, 20, 200,10);
+
+	return c;
     }
 
     function draw() {
@@ -59,6 +82,8 @@ function Wave(el,widthbox, scroller) {
 //	var replen = this.rlen;
 	var zoom = this.zoom;
 	var buf = this.buf;
+
+//	var dpr = 2;
 
 	var c=el.getContext("2d");
 	var w=el.width;
@@ -143,7 +168,7 @@ function Wave(el,widthbox, scroller) {
 	function shade(p,q) {
 	    //console.log("p="+p+" q="+q);
 	    c.save();
-	    c.fillStyle='lightgray';
+	    c.fillStyle=c.createPattern(pattern(),'repeat');//'lightgray';
 	    c.fillRect(p*zoom,-yscale,(q-p)*zoom,yscale*2);
 	    c.restore();
 	}
@@ -165,9 +190,7 @@ function Wave(el,widthbox, scroller) {
 	    c.moveTo(istart*zoom, 0);
 	    c.lineTo(iend*zoom, 0);
 	    c.stroke();
-	    var r='#'+(Math.random()*0xffffff|0).toString(16);
-	    //console.log(r);
-	    c.strokeStyle=r;
+	    c.strokeStyle='black';//'#'+(Math.random()*0xffffff|0x100000).toString(16);
 	    c.beginPath();
 	    for (var i=istart; i<iend; i++) {
 		var x=i*zoom;
@@ -190,6 +213,8 @@ function Wave(el,widthbox, scroller) {
 	c.restore();
     }
 
+//    var canvas = document.createElement("canvas");
+
     var wave={
 	el: el,
 	buf: null,
@@ -204,9 +229,10 @@ function Wave(el,widthbox, scroller) {
 	zoomby: zoomby,
 	scrollto: scrollto,
 	draw: draw,
+	pattern: pattern(),
 	invalidate: invalidate,
     };
- 
+
     wave.scroller.onscroll=function() {
 	wave.scrolloffset = scroller.scrollLeft; wave.draw();
     };

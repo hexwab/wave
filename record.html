@@ -1,11 +1,11 @@
 <html>
 <head>
 <style>
-div#canvasbox { position: relative; width: 800px}
-#canvas { position: absolute; top:0; left: 0; border-top: 1px solid black; border-bottom: 1px solid black; }
-#posbar { position: absolute; top:0; left: 20px; width:1px; height: 262px; background: darkblue; display: none; }
+div#canvasbox { position: relative; width: 100%}
+#canvas { position: absolute; top:0; left: 0; border-top: 1px solid black; border-bottom: 1px solid black; width: 100%; }
+#posbar { position: absolute; top:0; left: 20px; width:1px; height: 100%; background: darkblue; display: none; }
 #fakecanvas { width: 100%; overflow-x: scroll; }
-#fakecanvas2 { width: 1000px; height: 262px; }
+#fakecanvas2 { width: 400px; height: 262px; }
 </style>
 </head>
 <body>
@@ -19,10 +19,11 @@ div#canvasbox { position: relative; width: 800px}
 <input type=button id="zout" value="-"></input>
 <input type=button id="clear" value="Clear"></input>
 <input type=button id="i" value="Redraw"></input>
+<input type="checkbox" id="autozoom">Autozoom</input>
       <div id=canvasbox>
-	<div id="posbar"></div>
-	<canvas id="canvas" width=400 height=260></canvas>
+	<canvas id="canvas" height=260></canvas>
 	<div id="fakecanvas">
+	  <div id="posbar"></div>
 	  <div id="fakecanvas2"></div>
 	</div>
       </div>
