@@ -2,21 +2,19 @@
 
 This is a scrolling waveform viewer using canvas.
 
-Waveforms 
-
-
 # Demos
 
-simple: simplest possible usage
-wave: scroll and zoom around a large waveform  
-resize: illustrate redraw behaviour
-record: record audio from your microphone and play it back
-draw: draw a waveform with the mouse
+- [simple](simple.html): simplest possible usage
+- [demo](demo.html): scroll and zoom around a large waveform
+- [draw](draw.html): draw a waveform with the mouse
+- [record](record.html): record audio from your microphone and play it back
+- [redraw](redraw.html): illustrate redraw behaviour (try scrolling, resizing, etc.)
+- [huge](huge.html): stress test
 
 # Synopsis
 Create a new Waveform object:
 
-    var wave = new Waveform (box[, params]);
+    var wave = new Wave (box[, params]);
 
   - **box**: containing element. 
   - **params**: Object with properties to be set.  See below.
@@ -32,16 +30,22 @@ Create a new Waveform object:
      Style in which to draw the waveform, or "debug" for a random colour every redraw.  Default: "black".
 - **undefStyle** (string)
      Style in which to draw undefined regions.  May also be an HTMLImageElement or an HTMLCanvasElement or an HTMLVideoElement, in which case the element will be tiled.  Default: "gray".
+- **pointFunc** (string)
+     Point-drawing function, or falsy for no points.  Two examples are provided: **Wave.Squares** and **Wave.Lollipops**.  Default: null.
 - **bound** (boolean)
      Whether to prohibit zooming out into undefined regions (regions extending beyond the end of the buffer).  Default: true.
 - **autofit** (number)
      Automatically fit the entire buffer to the display.  Disables scrolling and zooming.  Default: false.
 - **scale** (number)
      The range for sample values is -**scale**..**scale**.  This could be useful if **buf** is a integer typed array, or for vertical zoom.  Example: set **scale** to 128 if **buf** is an Int8Array.  Default: 1.
-- **threshold** (number)
-     The zoom level in pixels [not necessarily px] per sample at which drawing switches from lines to slabs.  Lower values look better but take more CPU.  Default: 0.1.
 - **wheelZoom** (number)
      How much scrolling using a scroll wheel will zoom in or out.  The exact behaviour of this is browser- and device-dependent.  Higher values produce more zooming.  Default: 0.05.  If falsy, interception of mousewheel events is disabled.
+- **pointThreshold** (number)
+     The zoom level, in px per sample, above which individual points will be drawn.  Zero means points will never be drawn.  Infinity means points will always be drawn.  Default: 5.
+- **waveThreshold** (number)
+     The zoom level, in px per sample, above which the waveform will no longer be drawn.  Zero means the waveform will never be drawn.  Infinity means the waveform will always be drawn.  Default: Infinity.
+- **slabThreshold** (number)
+     The zoom level in pixels [not necessarily px] per sample at which drawing switches from lines to slabs.  Lower values look better but take more CPU.  Default: 0.1.
 
 ### Methods
 - **invalidate()**
@@ -83,3 +87,7 @@ Example: if **buf** has grown (e.g. if it's being filled incrementally).
     Sets the bar position, in samples.
 - **destroy()**
     Removes this bar, like **removebar()** above.
+
+# License
+
+LGPLv2+.
