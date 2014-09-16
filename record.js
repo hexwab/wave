@@ -131,6 +131,11 @@ var wave = new Wave(gebi("waveform"), {
 			bound: false,
 			waveStyle: 'indigo',
 			undefStyle: pattern(),
+
+		/* replace waveform with points at >5 pixels per sample */
+			pointFunc: Wave.Lollipops,
+			pointThreshold: 5,
+			waveThreshold: 5,
 		    });
 
 /* scope */

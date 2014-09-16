@@ -8,7 +8,11 @@ function gebi(id) {
     return document.getElementById(id);
 }
 
-var wave = new Wave(gebi("wave"), {buf: buf, waveStyle: 'darkgreen', threshold: 0.2});
+var wave = new Wave(gebi("wave"), {
+    buf: buf,
+    waveStyle: 'darkgreen',
+    pointFunc: Wave.Squares
+});
 wave.bound = true;
 wave.zoomby(0.01); /* zoom out */
 
