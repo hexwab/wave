@@ -82,6 +82,7 @@ Example: if **buf** has grown (e.g. if it's being filled incrementally).
     Position in samples.
 - **wave** (object)
     Parent Wave object.
+
 ### Bar methods
 - **setpos(pos)**
     Sets the bar position, in samples.
