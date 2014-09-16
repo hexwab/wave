@@ -1,32 +1,49 @@
 <html>
 <head>
+<title>Wave.js demo: record</title>
 <style>
-div#canvasbox { position: relative; width: 100%}
-#canvas { position: absolute; top:0; left: 0; border-top: 1px solid black; border-bottom: 1px solid black; width: 100%; }
-#posbar { position: absolute; top:0; left: 20px; width:1px; height: 100%; background: darkblue; display: none; }
-#fakecanvas { width: 100%; overflow-x: scroll; }
-#fakecanvas2 { width: 400px; height: 262px; }
+#status {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    height: 1em;
+    padding: 0.2em;
+    border-top: inset;
+    width: 100%;
+}
+
+#waveform {
+    height: 400px;
+}
+#scope {
+    width: 120px;
+    height: 80px;
+    position: fixed;
+    right: 0; top: 0;
+    background: white;
+    border-bottom: inset;
+    border-left: inset;
+}
 </style>
 </head>
 <body>
-<div id="status">
-</div>
-<meter id="meter" min="-12" max="0" low="-8" high="-1"></meter>
-<input type=button id="start" value="Start"></input>
+<div>
+<meter id="meter" high="0.9"></meter>
+<input type=button id="start" value="Record"></input>
 <input type=button id="stop" value="Stop"></input>
 <input type=button id="play" value="Play"></input>
-<input type=button id="zin" value="+"></input>
-<input type=button id="zout" value="-"></input>
 <input type=button id="clear" value="Clear"></input>
+<input type=button id="zin" value="Zoom in"></input>
+<input type=button id="zout" value="Zoom out"></input>
+<input type=button id="fit" value="Zoom to fit"></input>
 <input type=button id="i" value="Redraw"></input>
 <input type="checkbox" id="autozoom">Autozoom</input>
-      <div id=canvasbox>
-	<canvas id="canvas" height=260></canvas>
-	<div id="fakecanvas">
-	  <div id="posbar"></div>
-	  <div id="fakecanvas2"></div>
-	</div>
-      </div>
+</div>
+<br>
+<div id="waveform"></div>
+<div id="scope"></div>
+<div id="status">
+</div>
 <script src="wave.js"></script>
 <script src="record.js"></script>
 </body>

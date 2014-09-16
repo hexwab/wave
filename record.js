@@ -1,3 +1,4 @@
+/*** Web Audio context ***/
 var ctx;
 try { 
     ctx = new AudioContext();
@@ -5,169 +6,259 @@ try {
     try {
 	    ctx = new webkitAudioContext();
     } catch (e) {
-    alert("Web Audio init failed: "+e);
+	alert("Web Audio init failed: "+e);
     }
 }
 
-ctx.script = ctx.createScriptProcessor ||
-                 ctx.createJavaScriptNode;
-var node = ctx.script(
-	  2048, /* buf */
-	  1,    /* in */
-	  1     /* out */
-	 );
-
-var rec = [];
-var dirty = false;
+/*** Other local variables ***/
+var rec = []; /* recorded samples */
+var dirty = false; /* whether we have new audio */
 
 function gebi(el) { return document.getElementById(el); }
-
-
 var meter = gebi("meter");
 var el = gebi("status");
-var posbar = gebi("posbar");
+var posbar;
 var recording = false;
-gebi("start").onclick = function () { recording = true; };
-gebi("stop").onclick = function () { if (recording) recording = false; if (playing) stop(); };
-gebi("clear").onclick = function () { rec=[]; dirty = true; wave.invalidate(); };
-gebi("play").onclick = function () { if (!playing) { makebuf(); play(); } };
-gebi("zin").onclick = function () { wave.zoomby(2); };
-gebi("zout").onclick = function () { wave.zoomby(0.5); };
-gebi("i").onclick = function () { wave.invalidate(); };
-var autozoom, azel=gebi("autozoom");
-azel.onchange = function () { autozoom=azel.checked; };
-azel.onchange();
-node.onaudioprocess = function(e){
-    var buf=e.inputBuffer.getChannelData(0);
-    { /* meter */
-	var sum=0;
-	for (var i=0; i<buf.length; i++)
-	    sum += buf[i] * buf[i];
-	sum /= buf.length;
-	//    el.innerHTML=Math.log(sum)/Math.log(10)+" dB"+" len="+rec.length;
-	var vu = Math.log(sum)/Math.log(10);
-	meter.value = vu < -30 ? -30 : vu;
-    }
 
 
-    var status = (playing ? 'Playing' : 
-	(recording ? 'Recording' : 'Ready'));
-    var len = (rec.length/ctx.sampleRate).toFixed(2)+"sec ("+rec.length+" samples @ "+ctx.sampleRate+"Hz)";
-    el.innerHTML = status+" "+len;
+/*** Callbacks ***/
+function record () {
+    if (!playback.playing)
+	recording = true;
+}
+
+function stop () {
+    if (recording)
+	recording = false;
+
+    if (playback.playing)
+	playback.stop();
+}
+
+function play () {
+    if (playback.playing || recording)
+	return;
+
+    if (!playback.start(rec, finished))
+	return;
+
+    posbar = wave.addbar(0, 'blue');
+
+    /* when we're playing connect up the monitor to the output rather
+     * than the input.  Sadly this runs afoul of crbug.com/176808. */
+    input.disconnect(monitor);
+    playback.node.connect(monitor);
+}
+
+function finished() {
+    wave.removebar(posbar);
+    posbar = null;
+    playback.node.disconnect(monitor);
+    input.connect(monitor);
+}
+
+function clear() {
+    stop();
+    rec.length = 0;
+    wave.invalidate();
+}
+
+var buf = null;
+
+/* a buffer full of audio awaits us */ 
+function audio(e) {
+    buf = e.inputBuffer.getChannelData(0);
 
     if (recording) {
 	for (var i=0; i<buf.length; i++)
 	    rec.push(buf[i]);
-	dirty = true;
     }
+    dirty = true;
 }
 
-if (!navigator.getUserMedia)
-    navigator.getUserMedia = navigator.webkitGetUserMedia || navigator.mozGetUserMedia;
-navigator.getUserMedia({audio: true}, startUserMedia, function(e) {
+/* add callbacks */
+var callbacks = {
+    start: record,
+    stop: stop,
+    clear: clear,
+    play: play,
+    zin: function() { wave.zoomby(200); },
+    zout: function() { wave.zoomby(50); },
+    fit: function() { wave.zoomby(0); },
+    i: function() {wave.invalidate(); },
+};
+
+for (var i in callbacks) {
+    if (callbacks.hasOwnProperty(i))
+	gebi(i).addEventListener('click', callbacks[i], false);
+}
+
+var autozoom;
+var azel=gebi("autozoom");
+(azel.onchange = function () { autozoom=azel.checked; })();
+
+
+/*** Set up audio input ***/
+(navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia)
+    .call(navigator, { audio: true }, startmedia, function(e) {
 			  alert('No live audio input: ' + e);
 		       });
 
-function startUserMedia(stream) {
-    var input = ctx.createMediaStreamSource(stream);
-    console.log('Media stream created.');
-    
-    console.log('Input connected to audio context destination.');
-    
-    //source.context.connect(node);
-    //node.connect(ctx.destination);
+var node;
+var input;
 
-    //recorder = new Recorder(input);
+var monitor = (ctx.createScriptProcessor ||
+		ctx.createJavaScriptNode)
+	.call(ctx,
+	      2048, /* buffer size */
+	      1,    /* channels in */
+	      1     /* channels out */
+	     );
+monitor.connect(ctx.destination); /* I have no idea why this is needed */
+monitor.onaudioprocess = audio;
 
-    input.connect(node);
-    node.connect(ctx.destination);
-    console.log('Recorder initialised.');
+function startmedia(stream) {
+    input = ctx.createMediaStreamSource(stream);
+
+    input.connect(monitor);
 }
 
-var wave = new Wave(gebi("canvas"),gebi("fakecanvas2"),gebi("fakecanvas"));
-wave.buf = rec;
-wave.zoomby(0.004); /* zoom out */
 
-var playing = false;
-var timestarted;
-var recbuf;
-var playnode;
+/*** Waveform object ***/
+var wave = new Wave(gebi("waveform"), {
+			buf: rec,
+			zoom: 1/500, /* 500 samples per pixel */
+			bound: false,
+			waveStyle: 'indigo',
+			undefStyle: pattern(),
+		    });
 
+/* scope */
+var scope = new Wave(gebi("scope"), {
+    autofit: true
+});
+
+/* Make a stripy pattern (because we can) */
+function pattern() {
+    var c = document.createElement("canvas");
+    var ctx = c.getContext("2d");
+    c.width = c.height = 20; /* adjust to change stripe distance */
+    ctx.scale(c.width/4,c.height/4);
+    ctx.fillStyle="#555";
+    ctx.fillRect(0,0,4,4);
+    ctx.fillStyle="#aaa";
+    ctx.transform(1,-1,1,1,0,0);
+    ctx.fillRect(-3,0,6,1);
+    ctx.fillRect(-3,2,6,1);
+    return c;
+}
+
+/* update the waveform */
 function update () {
     if (dirty) {
-	wave.buf = rec;
-	if (wave.scrollto(rec.length, 0, 0.5) && autozoom)
-	    wave.zoomby(1/1.3);
-	wave.draw();
 	dirty = false;
+
+	if (recording) {
+	    /* scroll if we need to */
+	    var scrolled = wave.scrollto(rec.length, 0, 100);
+	    
+	    if (scrolled && autozoom)
+		wave.zoomby(80); /* zoom out if we need to */
+	    
+	    /* draw new data */
+	    wave.draw();
+	}
+
+	/* draw meter */
+	var sum = 0;
+	for (var i=0; i<buf.length; i++)
+	    sum += buf[i] * buf[i];
+	sum /= buf.length;
+	/* this isn't in units of anything in particular */
+	var vu = sum && Math.log(sum)/Math.log(10) / 10 + 1;
+	vo = vu < 0 ? 0 : vu;
+	meter.value = vu;
+
+	/* draw scope */
+	scope.buf = buf;
+	scope.invalidate();
     }
-    if (playing) {
-	/* draw point */
-	//console.log();
-	var pos = (ctx.currentTime - timestarted) * ctx.sampleRate;
-	var offset = pos*wave.zoom - wave.scrolloffset;
-	posbar.style.left = (offset|0)+"px";
-	wave.scrollto(pos, 0.05, 0.05);
-//	console.log((offset|0)+"px");
+
+    /* status line */
+    var status = (playback.playing ? 'Playing' : 
+		  (recording ? 'Recording' : 'Ready'));
+    var len = (rec.length/ctx.sampleRate).toFixed(2)+
+	"sec ("+rec.length+" samples @ "+ctx.sampleRate+"Hz, "+(rec.length*4/1048576).toFixed(1)+"MiB)";
+    el.innerHTML = status+" "+len;
+
+    if (playback.playing) {
+	/* set the bar to the current playback position */
+	var pos = playback.offset();
+	posbar.setpos(pos);
+
+	/* and make sure it's in view */ 
+        wave.scrollto(pos, 5, 5);
     }
+
     window.requestAnimationFrame(update);
 }
 
+/* kick off the updates */
 window.requestAnimationFrame(update);
-//setInterval(update, 100);
 
-//wave.buf = [0,1,0,1,0,1,1,0,1,1];
-//wave.zoomby(0); /* zoom out */
-//wave.invalidate();
-function makebuf() {
-    if (!rec.length)
-	return;
-    recbuf = ctx.createBuffer(1, rec.length, ctx.sampleRate);
-    var buf = recbuf.getChannelData(0);
-    for (var i=0; i<rec.length; i++)
-	buf[i] = rec[i];
-}
 
-function stopped() {
-    playing = false;
-    posbar.style.display = 'none';
-}
-function stop() {
-    try {
-	/* due to the imprecise timing, it's 
-	 * conceivable we may try this when already stopped.
-	 */ 
-	playnode.stop(0);
-    } catch (e) {}
-    stopped();
-}
+/*** Playback object ***/
+var playback = (function (ctx) {
+     var playback = {
+	 playing: false,
+	 timestarted: undefined,
+	 node: null,
+	 ctx: ctx
+     };
 
-function play() {
-    if (!recbuf)
-	return;
-    playnode = ctx.createBufferSource();
-    playnode.buffer = recbuf;
-    playnode.connect(ctx.destination);
-    timestarted = ctx.currentTime;
-    playnode.onended = stopped; /* hopefully at some point in the future this'll start working */
-    setTimeout(stopped, recbuf.length / ctx.sampleRate * 1000);
-    playnode.start(0);
-    posbar.style.display = 'block';
-    posbar.style.left = '0';
-    playing = true;
-}
+     playback.offset = function() {
+	 if (!this.playing)
+	     return undefined;
+	 
+	 return (this.ctx.currentTime - this.timestarted) * this.ctx.sampleRate;    
+     };    
 
-/*
-var playnode = ctx.script(4096, 0, 1);
-var offset = 0;
-function play() {
-    var buf=e.inputBuffer.getChannelData(0);
-    var len = rec.length-offset;
-    if (len > buf.length) len = buf.length;
-    var i;
-    for (i=0; i<len; i++)
-	buf[i] = rec[i+offset];
-    for (;i<buf.length; i++)
-	buf[i] = 0;
-}
-*/
+     /* start playback */
+     playback.start = function(buf, cb) {
+	 if (!buf || !buf.length)
+	     return false;
+	 this.node = this.ctx.createBufferSource();
+	 this.node.buffer = makebuf(buf);
+	 this.node.connect(this.ctx.destination);
+	 this.timestarted = this.ctx.currentTime;
+	 this.finished = cb;
+	 this.node.onended = this.stop;
+	 this.node.start(0);
+	 this.playing = true;
+	 return true;
+     };
+     
+     /* stop playback */
+     playback.stop = function() {
+	 /* can't rely on 'this' being set correctly */
+	 try {
+	     playback.node.stop(0);
+	 } catch (e) {}
+	 playback.playing = false;
+	 if (playback.finished)
+	     playback.finished();
+	 playback.node = null;
+     };
+     
+     /* turn an array of sample data into an AudioBuffer for playback */
+     function makebuf(rec) {
+	 var recbuf = ctx.createBuffer(1, rec.length, ctx.sampleRate);
+	 var buf = recbuf.getChannelData(0);
+	 for (var i=0; i<rec.length; i++)
+	     buf[i] = rec[i];
+	 
+	 return recbuf;
+     }
+     
+     return playback;
+})(ctx);

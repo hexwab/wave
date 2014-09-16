@@ -1,0 +1,18 @@
+<html>
+<head>
+<title>Wave.js demo: huge</title>
+<body>
+  <script src="wave.js"></script>
+  <script>
+    var buf = new Int8Array(2e8);
+    for (var i=0; i<buf.length; i++) {
+        buf[i] = (i >> 20) ^ (i >> 10);
+    }
+
+    var wave = new Wave(document.body,
+			{ buf: buf, scale: 128, zoom: 0, pointFunc: Wave.Squares
+			 });
+
+   </script>
+</body>
+</html>
